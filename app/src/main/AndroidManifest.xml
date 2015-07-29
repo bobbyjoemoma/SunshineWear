@@ -28,6 +28,10 @@
     <uses-permission
         android:name="android.permission.AUTHENTICATE_ACCOUNTS"/>
 
+    <uses-feature android:name="android.hardware.type.watch" /> <!-- Required to act as a custom watch face. -->
+    <uses-permission android:name="com.google.android.permission.PROVIDE_BACKGROUND" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -88,6 +92,11 @@
                 android:name="android.content.SyncAdapter"
                 android:resource="@xml/syncadapter" />
         </service>
+
+        <meta-data
+            android:name="com.google.android.gms.version"
+            android:value="@integer/google_play_services_version" />
+
     </application>
 
 </manifest>
