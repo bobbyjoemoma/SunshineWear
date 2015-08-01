@@ -31,12 +31,18 @@ import com.example.android.sunshine.app.MainActivity;
 import com.example.android.sunshine.app.R;
 import com.example.android.sunshine.app.Utility;
 import com.example.android.sunshine.app.data.WeatherContract;
+import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.wearable.Asset;
+import com.google.android.gms.wearable.DataApi;
+import com.google.android.gms.wearable.PutDataMapRequest;
+import com.google.android.gms.wearable.Wearable;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -48,7 +54,7 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
     public final String LOG_TAG = SunshineSyncAdapter.class.getSimpleName();
     // Interval at which to sync with the weather, in seconds.
     // 60 seconds (1 minute) * 180 = 3 hours
-    public static final int SYNC_INTERVAL = 60 * 180;
+    public static final int SYNC_INTERVAL = 20;//60 * 180;
     public static final int SYNC_FLEXTIME = SYNC_INTERVAL/3;
     private static final long DAY_IN_MILLIS = 1000 * 60 * 60 * 24;
     private static final int WEATHER_NOTIFICATION_ID = 3004;
@@ -298,9 +304,10 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
                 // delete old data so we don't build up an endless history
                 getContext().getContentResolver().delete(WeatherContract.WeatherEntry.CONTENT_URI,
                         WeatherContract.WeatherEntry.COLUMN_DATE + " <= ?",
-                        new String[] {Long.toString(dayTime.setJulianDay(julianStartDay-1))});
+                        new String[]{Long.toString(dayTime.setJulianDay(julianStartDay - 1))});
 
                 notifyWeather();
+                updateWatchFace();
             }
 
             Log.d(LOG_TAG, "Sync Complete. " + cVVector.size() + " Inserted");
@@ -391,6 +398,45 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
                 cursor.close();
             }
         }
+    }
+
+    public void updateWatchFace(){
+        Context context = getContext();
+        String locationQuery = Utility.getPreferredLocation(context);
+        Uri weatherUri = WeatherContract.WeatherEntry.buildWeatherLocationWithDate(locationQuery, System.currentTimeMillis());
+        Cursor c = context.getContentResolver().query(weatherUri,
+                new String[] {
+                        WeatherContract.WeatherEntry.COLUMN_WEATHER_ID,
+                        WeatherContract.WeatherEntry.COLUMN_MAX_TEMP,
+                        WeatherContract.WeatherEntry.COLUMN_MIN_TEMP
+                }
+                , null, null, null);
+        if (c.moveToFirst()) {
+            Log.v("data","data found");
+            int weatherId = c.getInt(
+                    c.getColumnIndex(WeatherContract.WeatherEntry.COLUMN_WEATHER_ID));
+            String high_temp = Utility.formatTemperature(context,
+                    c.getDouble(
+                            c.getColumnIndex(WeatherContract.WeatherEntry.COLUMN_MAX_TEMP)));
+            String low_temp = Utility.formatTemperature(context,
+                    c.getDouble(
+                            c.getColumnIndex(WeatherContract.WeatherEntry.COLUMN_MIN_TEMP)));
+            Log.v("temp data",high_temp);
+            Bitmap icon = BitmapFactory.decodeResource(context.getResources(),
+                    Utility.getArtResourceForWeatherCondition(weatherId));
+
+            final ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+            icon.compress(Bitmap.CompressFormat.PNG, 100, byteStream);
+            Asset icon_asset = Asset.createFromBytes(byteStream.toByteArray());
+
+            PutDataMapRequest requestMap = PutDataMapRequest.create("/weather");
+            requestMap.getDataMap().putAsset("ICON_KEY", icon_asset);
+            requestMap.getDataMap().putString("TEMPERATURE_HIGH_KEY", high_temp);
+            requestMap.getDataMap().putString("TEMPERATURE_LOW_KEY", low_temp);
+            requestMap.getDataMap().putString("TEMPERATURE", "dum");
+            PendingResult<DataApi.DataItemResult> pendingResult = Wearable.DataApi.putDataItem(MainActivity.googleApiClient, requestMap.asPutDataRequest());
+        }
+        c.close();
     }
 
     /**

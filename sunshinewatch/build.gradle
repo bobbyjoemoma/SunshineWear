@@ -6,7 +6,7 @@ android {
     buildToolsVersion "22.0.1"
 
     defaultConfig {
-        applicationId "com.tim.sunshinewatch"
+        applicationId "com.example.android.sunshine.app"
         minSdkVersion 21
         targetSdkVersion 22
         versionCode 1
